@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Le Monde de la Musique — explore le catalogue musical mondial (iTunes), écoute des extraits et crée ta playlist locale.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="canonical" href="https://musicdumonde.fr/">
+<title>Le Monde de la Musique — Music Codex</title>
+<style>
+  :root{
+    --bg:#0e1014; --panel:#171a21; --panel2:#1e222c; --text:#eef1f6; --muted:#9aa3b2;
+    --accent1:#7c5cff; --accent2:#00d4ff; --danger:#ff5c7a; --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%,#222845 0%,var(--bg) 55%) fixed,var(--bg);
+    color:var(--text); padding-bottom:110px;
+  }
+  button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+  img{display:block}
+
+  /* ---------- En-tête ---------- */
+  header{
+    position:sticky;top:0;z-index:20;padding:14px 20px;
+    background:rgba(14,16,20,.85);backdrop-filter:blur(12px);
+    border-bottom:1px solid #ffffff12;display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  }
+  .logo{font-size:1.15rem;font-weight:800;letter-spacing:.3px;white-space:nowrap;
+    background:linear-gradient(90deg,var(--accent1),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .searchbar{flex:1;min-width:240px;display:flex;gap:8px}
+  #searchInput{
+    flex:1;padding:11px 16px;border-radius:999px;border:1px solid #ffffff1f;
+    background:var(--panel);color:var(--text);outline:none;font-size:.95rem;
+  }
+  #searchInput:focus{border-color:var(--accent1);box-shadow:0 0 0 3px #7c5cff33}
+  #searchBtn{
+    padding:11px 18px;border-radius:999px;font-weight:600;color:#0b0d12;
+    background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  }
+  .controls-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .tabs{display:flex;background:var(--panel);border-radius:999px;padding:4px;border:1px solid #ffffff14}
+  .tabs button{padding:7px 14px;border-radius:999px;color:var(--muted);font-size:.85rem}
+  .tabs button.active{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#0b0d12;font-weight:700}
+  select{
+    padding:9px 12px;border-radius:999px;background:var(--panel);color:var(--text);
+    border:1px solid #ffffff1f;font-size:.85rem;
+  }
+  #playlistToggle{
+    padding:9px 16px;border-radius:999px;background:var(--panel);border:1px solid #ffffff1f;font-size:.85rem;
+  }
+  #playlistToggle:hover{border-color:var(--accent2)}
+  #plCount{display:inline-block;min-width:20px;padding:1px 6px;margin-left:4px;border-radius:999px;
+    background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#0b0d12;font-weight:700;font-size:.75rem}
+
+  /* ---------- Genres ---------- */
+  #genres{display:flex;gap:8px;flex-wrap:wrap;padding:16px 20px 4px}
+  .chip{
+    padding:7px 14px;border-radius:999px;background:var(--panel);border:1px solid #ffffff14;
+    color:var(--muted);font-size:.82rem;transition:.15s;
+  }
+  .chip:hover{color:var(--text);border-color:var(--accent1);transform:translateY(-1px)}
+
+  /* ---------- Résultats ---------- */
+  #resultsInfo{padding:10px 22px;color:var(--muted);font-size:.85rem;min-height:1.4em}
+  .grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+    gap:16px;padding:10px 20px 30px;
+  }
+  .card{
+    background:var(--panel);border:1px solid #ffffff10;border-radius:var(--radius);
+    padding:12px;display:flex;flex-direction:column;gap:8px;transition:.18s;
+  }
+  .card:hover{transform:translateY(-3px);border-color:#7c5cff66;box-shadow:0 10px 28px #0008}
+  .card.active{border-color:var(--accent2);box-shadow:0 0 0 2px #00d4ff55}
+  .art{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1;background:#262b38}
+  .art img{width:100%;height:100%;object-fit:cover}
+  .art .placeholder{
+    width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+    font-size:2.4rem;font-weight:800;color:#ffffffcc;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));
+  }
+  .playOverlay{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:#0009;font-size:2rem;opacity:0;transition:.15s;
+  }
+  .art:hover .playOverlay{opacity:1}
+  .playOverlay:disabled{cursor:not-allowed;color:#ffffff44}
+  .card h3{font-size:.92rem;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .card p{font-size:.8rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:var(--muted)}
+  .badge{padding:2px 8px;border-radius:999px;background:#7c5cff22;color:#b9a8ff;max-width:65%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .actions{display:flex;gap:8px;margin-top:auto}
+  .listen{
+    flex:1;padding:8px;border-radius:8px;font-size:.8rem;font-weight:600;color:#0b0d12;
+    background:linear-gradient(90deg,var(--accent1),var(--accent2));
+  }
+  .listen:disabled{background:var(--panel2);color:var(--muted);cursor:not-allowed}
+  .add{padding:8px 12px;border-radius:8px;background:var(--panel2);border:1px solid #ffffff1c;font-size:.9rem}
+  .add:hover{border-color:var(--accent2);color:var(--accent2)}
+
+  .welcome,.empty,.errorBox{
+    grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted);
+  }
+  .welcome h2{font-size:1.6rem;margin-bottom:10px;color:var(--text)}
+  .errorBox{color:var(--danger)}
+  .spinner{
+    grid-column:1/-1;text-align:center;padding:50px;color:var(--muted);
+  }
+  .spinner::after{content:"";display:inline-block;width:26px;height:26px;margin-left:10px;vertical-align:middle;
+    border:3px solid #ffffff22;border-top-color:var(--accent2);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- Playlist ---------- */
+  #playlistPanel{
+    position:fixed;top:0;right:0;bottom:0;width:min(360px,92vw);z-index:30;
+    background:var(--panel);border-left:1px solid #ffffff14;transform:translateX(105%);
+    transition:transform .25s ease;display:flex;flex-direction:column;
+  }
+  #playlistPanel.open{transform:none;box-shadow:-20px 0 60px #000a}
+  #playlistPanel header{
+    position:static;padding:16px;background:none;border-bottom:1px solid #ffffff12;
+    display:flex;align-items:center;gap:8px;
+  }
+  #playlistPanel h2{font-size:1rem;flex:1}
+  .plHeadBtn{padding:6px 10px;border-radius:8px;background:var(--panel2);border:1px solid #ffffff1c;font-size:.78rem}
+  .plHeadBtn:hover{border-color:var(--accent2)}
+  #playlist{list-style:none;overflow-y:auto;flex:1;padding:10px}
+  #playlist li{
+    display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;cursor:pointer;
+  }
+  #playlist li:hover{background:#ffffff0d}
+  #playlist li.active{background:#7c5cff22}
+  #playlist li img,#playlist li .thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none}
+  #playlist li .thumb{display:flex;align-items:center;justify-content:center;font-weight:800;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2))}
+  .plMeta{flex:1;min-width:0}
+  .plMeta .t{font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .plMeta .a{font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .plMeta .noprev{font-size:.68rem;color:var(--danger)}
+  .rm{color:var(--muted);padding:6px;font-size:.95rem;flex:none}
+  .rm:hover{color:var(--danger)}
+  .plEmpty{padding:30px 16px;text-align:center;color:var(--muted);font-size:.85rem}
+
+  /* ---------- Lecteur ---------- */
+  #player{
+    position:fixed;left:0;right:0;bottom:0;z-index:25;height:92px;
+    display:flex;align-items:center;gap:16px;padding:12px 18px;
+    background:rgba(23,26,33,.92);backdrop-filter:blur(14px);border-top:1px solid #ffffff14;
+  }
+  #pArt{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#262b38;flex:none}
+  .pMeta{width:180px;min-width:0;flex:none}
+  #pTitle{font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #pArtist{font-size:.75rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pControls{display:flex;gap:6px;align-items:center;flex:none}
+  .pControls button{
+    width:42px;height:42px;border-radius:50%;background:var(--panel2);border:1px solid #ffffff1c;font-size:1rem;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .pControls button:hover{border-color:var(--accent2)}
+  #playBtn{width:52px;height:52px;font-size:1.25rem;color:#0b0d12;border:none;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2))}
+  .pProgress{flex:1;display:flex;align-items:center;gap:10px;min-width:120px}
+  .pProgress span{font-size:.72rem;color:var(--muted);width:38px;text-align:center;flex:none}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:#ffffff22;cursor:pointer}
+  #seek{flex:1}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:13px;height:13px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2))}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border:none;border-radius:50%;background:var(--accent2)}
+  .pVol{display:flex;align-items:center;gap:8px;flex:none}
+  #vol{width:90px}
+  #muteBtn{font-size:1.05rem;padding:6px}
+  .legalLink{position:absolute;right:14px;bottom:100px;font-size:.68rem;color:#6b7383;
+    text-decoration:none;padding:4px 10px;border-radius:999px;background:#171a21cc;
+    border:1px solid #ffffff10}
+  .legalLink:hover{color:var(--accent2);border-color:var(--accent2)}
+
+  @media (max-width:760px){
+    .pMeta{display:none}
+    #vol{width:60px}
+    .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎵 Le Monde de la Musique</div>
+  <div class="searchbar">
+    <input id="searchInput" type="search" placeholder="Rechercher un titre, un artiste, un album…" autocomplete="off">
+    <button id="searchBtn">Rechercher</button>
+  </div>
+  <div class="controls-row">
+    <div class="tabs" id="entityTabs">
+      <button data-entity="song" class="active">Titres</button>
+      <button data-entity="musicArtist">Artistes</button>
+      <button data-entity="album">Albums</button>
+    </div>
+    <select id="countrySelect" title="Origine / plateforme iTunes">
+      <option value="FR" selected>🇫🇷 France</option>
+      <option value="BE">🇧🇪 Belgique</option>
+      <option value="CH">🇨🇭 Suisse</option>
+      <option value="CA">🇨🇦 Canada</option>
+      <option value="US">🇺🇸 États-Unis</option>
+      <option value="GB">🇬🇧 Royaume-Uni</option>
+      <option value="DE">🇩🇪 Allemagne</option>
+      <option value="ES">🇪🇸 Espagne</option>
+      <option value="IT">🇮🇹 Italie</option>
+      <option value="PT">🇵🇹 Portugal</option>
+      <option value="NL">🇳🇱 Pays-Bas</option>
+      <option value="JP">🇯🇵 Japon</option>
+      <option value="KR">🇰🇷 Corée du Sud</option>
+      <option value="BR">🇧🇷 Brésil</option>
+      <option value="MA">🇲🇦 Maroc</option>
+      <option value="DZ">🇩🇿 Algérie</option>
+      <option value="SN">🇸🇳 Sénégal</option>
+      <option value="CI">🇨🇮 Côte d'Ivoire</option>
+    </select>
+    <button id="playlistToggle">🎶 Ma playlist <span id="plCount">0</span></button>
+  </div>
+</header>
+
+<main>
+  <section id="genres" aria-label="Genres"></section>
+  <section id="resultsInfo"></section>
+  <section id="results" class="grid">
+    <div class="welcome">
+      <h2>Bienvenue 👋</h2>
+      <p>Tape un titre, un artiste ou un album dans la barre de recherche,<br>
+      ou explore le catalogue par genre et par pays d'origine.</p>
+    </div>
+  </section>
+</main>
+
+<aside id="playlistPanel" aria-label="Playlist">
+  <header>
+    <h2>🎶 Ma playlist</h2>
+    <label class="plHeadBtn" title="Importer tes propres fichiers audio (session en cours uniquement)">
+      📁 Importer
+      <input id="importInput" type="file" accept="audio/*" multiple hidden>
+    </label>
+    <button class="plHeadBtn" id="clearPl">Tout effacer</button>
+    <button class="plHeadBtn" id="closePl">✕</button>
+  </header>
+  <ul id="playlist"></ul>
+</aside>
+
+<footer id="player">
+  <img id="pArt" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+  <div class="pMeta">
+    <div id="pTitle">Aucune lecture</div>
+    <div id="pArtist">—</div>
+  </div>
+  <div class="pControls">
+    <button id="prevBtn" title="Précédent">⏮</button>
+    <button id="playBtn" title="Lecture / Pause">▶</button>
+    <button id="nextBtn" title="Suivant">⏭</button>
+  </div>
+  <div class="pProgress">
+    <span id="tCur">0:00</span>
+    <input type="range" id="seek" min="0" max="0" step="0.1" value="0">
+    <span id="tDur">0:00</span>
+  </div>
+  <div class="pVol">
+    <button id="muteBtn" title="Muet">🔊</button>
+    <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
+  </div>
+</footer>
+
+<a class="legalLink" href="mentions-legales.html">Mentions légales</a>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Le Monde de la Musique — Music Codex
+   Catalogue : iTunes Search API (extraits audio officiels ~30 s)
+   ============================================================ */
+
+const $ = s => document.querySelector(s);
+const audio = $("#audio");
+const PL_KEY = "mdm_playlist_v1";
+
+const state = {
+  entity: "song",        // song | musicArtist | album
+  country: "FR",         // plateforme iTunes (origine)
+  results: [],           // résultats courants
+  queue: [],             // file de lecture
+  index: -1,             // index dans la file
+  playlist: [],          // playlist locale (localStorage)
+  lastTerm: "",          // dernière recherche
+};
+
+/* ---------- Utilitaires ---------- */
+const esc = s => (s ?? "").toString().replace(/[&<>"']/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const fmtMs = ms => {
+  if (ms == null) return "";
+  const s = Math.round(ms / 1000);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+};
+const fmtSec = s => {
+  if (!isFinite(s)) return "0:00";
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+};
+const bigArt = url => url ? url.replace("100x100bb", "300x300bb") : null;
+const thumbArt = url => url ? url.replace("100x100bb", "60x60bb") : null;
+
+/* ---------- Genres proposés ---------- */
+const GENRES = [
+  ["Pop", "pop"], ["Rock", "rock"], ["Rap / Hip-Hop", "hip hop"], ["R&B", "r&b"],
+  ["Électro", "electronic"], ["Dance", "dance"], ["Jazz", "jazz"],
+  ["Classique", "classique"], ["Variété FR", "variété française"], ["Reggae", "reggae"],
+  ["Metal", "metal"], ["Country", "country"], ["Blues", "blues"], ["Latino", "latino"],
+  ["K-Pop", "k-pop"], ["Afrobeat", "afrobeat"], ["Soul / Funk", "soul funk"], ["Indie", "indie"],
+];
+
+$("#genres").innerHTML = GENRES.map(([label, term]) =>
+  `<button class="chip" data-term="${esc(term)}">${esc(label)}</button>`).join("");
+
+/* ============================================================
+   RECHERCHE — iTunes Search API (jusqu'à 200 résultats)
+   ============================================================ */
+let debounceTimer = null;
+
+function doSearch(term) {
+  term = (term || "").trim();
+  if (term.length < 2) return;
+  state.lastTerm = term;
+  const box = $("#results");
+  box.innerHTML = `<div class="spinner">Recherche en cours…</div>`;
+  $("#resultsInfo").textContent = "";
+
+  const url = "https://itunes.apple.com/search"
+    + "?term=" + encodeURIComponent(term)
+    + "&media=music"
+    + "&entity=" + encodeURIComponent(state.entity)
+    + "&limit=200"
+    + "&country=" + encodeURIComponent(state.country);
+
+  fetch(url)
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(data => { state.results = data.results || []; renderResults(); })
+    .catch(err => {
+      box.innerHTML = `<div class="errorBox">⚠️ Erreur lors de la recherche : ${esc(err.message)}<br>
+        Vérifie ta connexion Internet puis réessaie.</div>`;
+    });
+}
+
+/* Charge les pistes d'un album via l'API Lookup */
+function loadAlbum(collectionId, albumName) {
+  const box = $("#results");
+  box.innerHTML = `<div class="spinner">Chargement de l'album…</div>`;
+  const url = "https://itunes.apple.com/lookup?id=" + encodeURIComponent(collectionId)
+    + "&entity=song&limit=200&country=" + encodeURIComponent(state.country);
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      state.results = (data.results || []).filter(x => x.wrapperType === "track");
+      renderResults("Pistes de l'album « " + (albumName || "") + " »");
+    })
+    .catch(err => {
+      box.innerHTML = `<div class="errorBox">⚠️ Impossible de charger l'album : ${esc(err.message)}</div>`;
+    });
+}
+
+/* ============================================================
+   AFFICHAGE DES RÉSULTATS
+   ============================================================ */
+function renderResults(customInfo) {
+  const box = $("#results");
+  const list = state.results;
+
+  if (!list.length) {
+    box.innerHTML = `<div class="empty">😕 Aucun résultat. Essaie un autre mot-clé, genre ou pays.</div>`;
+    $("#resultsInfo").textContent = "";
+    return;
+  }
+
+  $("#resultsInfo").textContent = customInfo
+    ? customInfo + " — " + list.length + " résultat(s)"
+    : list.length + " résultat(s) — catalogue " + state.country;
+
+  if (state.entity === "musicArtist") { renderArtists(box, list); return; }
+  if (state.entity === "album")       { renderAlbums(box, list);  return; }
+  renderTracks(box, list.filter(x => x.wrapperType === "track" || x.kind === "song"));
+}
+
+function renderTracks(box, tracks) {
+  if (!tracks.length) {
+    box.innerHTML = `<div class="empty">😕 Aucun titre trouvé.</div>`;
+    return;
+  }
+  box.innerHTML = tracks.map((t, i) => {
+    const noPrev = !t.previewUrl;
+    return `
+    <article class="card" data-tid="${t.trackId}">
+      <div class="art">
+        <img loading="lazy" src="${esc(bigArt(t.artworkUrl100) || "")}" alt=""
+             onerror="this.outerHTML='<div class=placeholder>🎵</div>'">
+        <button class="playOverlay" data-action="play" data-i="${i}" ${noPrev ? "disabled" : ""}
+                title="${noPrev ? "Aucun extrait disponible" : "Écouter l'extrait"}">▶</button>
+      </div>
+      <h3 title="${esc(t.trackName)}">${esc(t.trackName)}</h3>
+      <p>${esc(t.artistName)}</p>
+      <p title="${esc(t.collectionName || "")}">${esc(t.collectionName || "")}</p>
+      <div class="meta">
+        <span class="badge">${esc(t.primaryGenreName || "—")}</span>
+        <span>${fmtMs(t.trackTimeMillis)}</span>
+      </div>
+      <div class="actions">
+        <button class="listen" data-action="play" data-i="${i}" ${noPrev ? "disabled" : ""}>
+          ${noPrev ? "Pas d'extrait" : "▶ Écouter"}
+        </button>
+        <button class="add" data-action="add" data-i="${i}" title="Ajouter à la playlist">＋</button>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function renderArtists(box, artists) {
+  box.innerHTML = artists.map(a => `
+    <article class="card" data-action="artist" data-name="${esc(a.artistName)}" style="cursor:pointer">
+      <div class="art"><div class="placeholder">${esc((a.artistName || "?").charAt(0).toUpperCase())}</div></div>
+      <h3>${esc(a.artistName)}</h3>
+      <p>${esc(a.primaryGenreName || "Artiste")}</p>
+      <div class="actions"><button class="listen">Voir les titres →</button></div>
+    </article>`).join("");
+}
+
+function renderAlbums(box, albums) {
+  box.innerHTML = albums.map(a => `
+    <article class="card" data-action="album" data-id="${a.collectionId}" data-name="${esc(a.collectionName)}" style="cursor:pointer">
+      <div class="art">
+        <img loading="lazy" src="${esc(bigArt(a.artworkUrl100) || "")}" alt=""
+             onerror="this.outerHTML='<div class=placeholder>💿</div>'">
+      </div>
+      <h3 title="${esc(a.collectionName)}">${esc(a.collectionName)}</h3>
+      <p>${esc(a.artistName)}</p>
+      <div class="meta">
+        <span class="badge">${esc(a.primaryGenreName || "—")}</span>
+        <span>${a.trackCount ? a.trackCount + " titres" : ""}</span>
+      </div>
+      <div class="actions"><button class="listen">Ouvrir l'album →</button></div>
+    </article>`).join("");
+}
+
+/* Délégation d'événements sur la grille de résultats */
+$("#results").addEventListener("click", e => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+
+  if (action === "play" && !btn.disabled) {
+    const tracks = state.results.filter(x => (x.wrapperType === "track" || x.kind === "song") && x.previewUrl);
+    const t = state.results.filter(x => x.wrapperType === "track" || x.kind === "song")[+btn.dataset.i];
+    playTrack(t, tracks);
+  } else if (action === "add") {
+    const tracks = state.results.filter(x => x.wrapperType === "track" || x.kind === "song");
+    addToPlaylist(tracks[+btn.dataset.i]);
+  } else if (action === "artist") {
+    setEntity("song");
+    $("#searchInput").value = btn.dataset.name;
+    doSearch(btn.dataset.name);
+  } else if (action === "album") {
+    loadAlbum(btn.dataset.id, btn.dataset.name);
+  }
+});
+
+/* ============================================================
+   LECTEUR AUDIO
+   ============================================================ */
+function playTrack(track, context) {
+  if (!track || !track.previewUrl) return;
+  const queue = (context && context.length ? context : [track]).filter(t => t.previewUrl);
+  const idx = Math.max(0, queue.findIndex(t => t.trackId === track.trackId));
+  state.queue = queue;
+  state.index = idx;
+  startCurrent();
+}
+
+function startCurrent() {
+  const t = state.queue[state.index];
+  if (!t) return;
+  audio.src = t.previewUrl;
+  audio.play().catch(() => {});
+  $("#pTitle").textContent = t.trackName || "—";
+  $("#pArtist").textContent = t.artistName || "";
+  const art = thumbArt(t.artworkUrl100);
+  $("#pArt").src = art || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+  markActive(t.trackId);
+}
+
+function markActive(tid) {
+  document.querySelectorAll(".card").forEach(c => c.classList.toggle("active", c.dataset.tid == tid));
+  document.querySelectorAll("#playlist li").forEach(li => li.classList.toggle("active", li.dataset.tid == tid));
+}
+
+function step(delta) {
+  if (!state.queue.length) return;
+  // Précédent : recommence le morceau si > 3 s écoutées
+  if (delta < 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }
+  const n = state.queue.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (state.index + delta * k + n * k) % n;
+    if (state.queue[i].previewUrl) { state.index = i; startCurrent(); return; }
+  }
+}
+
+$("#playBtn").addEventListener("click", () => {
+  if (!audio.src && state.queue.length) { startCurrent(); return; }
+  if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+});
+$("#nextBtn").addEventListener("click", () => step(1));
+$("#prevBtn").addEventListener("click", () => step(-1));
+
+audio.addEventListener("play",  () => { $("#playBtn").textContent = "⏸"; });
+audio.addEventListener("pause", () => { $("#playBtn").textContent = "▶"; });
+audio.addEventListener("ended", () => step(1));
+
+audio.addEventListener("loadedmetadata", () => {
+  $("#seek").max = audio.duration || 0;
+  $("#tDur").textContent = fmtSec(audio.duration);
+});
+audio.addEventListener("timeupdate", () => {
+  if (!$("#seek").matches(":active")) $("#seek").value = audio.currentTime;
+  $("#tCur").textContent = fmtSec(audio.currentTime);
+});
+$("#seek").addEventListener("input", e => { audio.currentTime = +e.target.value; });
+
+$("#vol").addEventListener("input", e => {
+  audio.volume = +e.target.value;
+  audio.muted = false;
+  $("#muteBtn").textContent = audio.volume === 0 ? "🔇" : audio.volume < .5 ? "🔉" : "🔊";
+});
+$("#muteBtn").addEventListener("click", () => {
+  audio.muted = !audio.muted;
+  $("#muteBtn").textContent = audio.muted ? "🔇" : "🔊";
+});
+audio.volume = 0.8;
+
+/* ============================================================
+   PLAYLIST LOCALE (localStorage)
+   ============================================================ */
+function loadPlaylist() {
+  try {
+    const raw = localStorage.getItem(PL_KEY);
+    state.playlist = raw ? JSON.parse(raw) : [];
+  } catch { state.playlist = []; }
+}
+function savePlaylist() {
+  // Les fichiers importés (blob:) ne survivent pas au rechargement : non persistés
+  const persist = state.playlist.filter(t => !t.isLocal);
+  try { localStorage.setItem(PL_KEY, JSON.stringify(persist)); } catch {}
+}
+
+function addToPlaylist(track) {
+  if (!track) return;
+  if (state.playlist.some(t => t.trackId === track.trackId)) { openPlaylist(); return; }
+  state.playlist.push({
+    trackId: track.trackId, trackName: track.trackName, artistName: track.artistName,
+    collectionName: track.collectionName, artworkUrl100: track.artworkUrl100,
+    previewUrl: track.previewUrl, trackTimeMillis: track.trackTimeMillis,
+    primaryGenreName: track.primaryGenreName,
+  });
+  savePlaylist(); renderPlaylist(); openPlaylist();
+}
+
+function renderPlaylist() {
+  const ul = $("#playlist");
+  $("#plCount").textContent = state.playlist.length;
+  if (!state.playlist.length) {
+    ul.innerHTML = `<div class="plEmpty">Ta playlist est vide.<br>Ajoute des morceaux avec le bouton ＋<br>ou importe tes propres fichiers audio.</div>`;
+    return;
+  }
+  ul.innerHTML = state.playlist.map((t, i) => `
+    <li data-tid="${t.trackId}" data-i="${i}">
+      ${t.artworkUrl100
+        ? `<img src="${esc(thumbArt(t.artworkUrl100))}" alt="">`
+        : `<div class="thumb">🎵</div>`}
+      <div class="plMeta">
+        <div class="t">${esc(t.trackName)}</div>
+        <div class="a">${esc(t.artistName)}${t.trackTimeMillis ? " · " + fmtMs(t.trackTimeMillis) : ""}</div>
+        ${t.previewUrl ? "" : `<div class="noprev">Aucun extrait disponible</div>`}
+      </div>
+      <button class="rm" data-rm="${i}" title="Retirer">✕</button>
+    </li>`).join("");
+  const cur = state.queue[state.index];
+  if (cur) markActive(cur.trackId);
+}
+
+$("#playlist").addEventListener("click", e => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm) {
+    state.playlist.splice(+rm.dataset.rm, 1);
+    savePlaylist(); renderPlaylist();
+    return;
+  }
+  const li = e.target.closest("li[data-i]");
+  if (li) playTrack(state.playlist[+li.dataset.i], state.playlist);
+});
+
+$("#clearPl").addEventListener("click", () => {
+  state.playlist = []; savePlaylist(); renderPlaylist();
+});
+$("#playlistToggle").addEventListener("click", () => $("#playlistPanel").classList.toggle("open"));
+$("#closePl").addEventListener("click", () => $("#playlistPanel").classList.remove("open"));
+function openPlaylist() { $("#playlistPanel").classList.add("open"); }
+
+/* Import de fichiers audio locaux (droits détenus par l'utilisateur) */
+$("#importInput").addEventListener("change", e => {
+  [...e.target.files].forEach(f => {
+    state.playlist.unshift({
+      trackId: "local-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+      trackName: f.name.replace(/\.[^.]+$/, ""),
+      artistName: "Fichier local",
+      collectionName: "Import local",
+      artworkUrl100: null,
+      previewUrl: URL.createObjectURL(f),
+      trackTimeMillis: null,
+      isLocal: true,
+    });
+  });
+  savePlaylist(); renderPlaylist(); openPlaylist();
+  e.target.value = "";
+});
+
+/* ============================================================
+   BARRE DE RECHERCHE, ONGLETS, ORIGINE, GENRES
+   ============================================================ */
+$("#searchBtn").addEventListener("click", () => doSearch($("#searchInput").value));
+$("#searchInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") doSearch(e.target.value);
+});
+$("#searchInput").addEventListener("input", e => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => doSearch(e.target.value), 450);
+});
+
+function setEntity(entity) {
+  state.entity = entity;
+  document.querySelectorAll("#entityTabs button").forEach(b =>
+    b.classList.toggle("active", b.dataset.entity === entity));
+}
+$("#entityTabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-entity]");
+  if (!b) return;
+  setEntity(b.dataset.entity);
+  if (state.lastTerm) doSearch($("#searchInput").value || state.lastTerm);
+});
+
+$("#countrySelect").addEventListener("change", e => {
+  state.country = e.target.value;
+  if (state.lastTerm) doSearch(state.lastTerm);
+});
+
+$("#genres").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  setEntity("song");
+  $("#searchInput").value = chip.dataset.term;
+  doSearch(chip.dataset.term);
+});
+
+/* ---------- Initialisation ---------- */
+loadPlaylist();
+renderPlaylist();
+</script>
+</body>
+</html>

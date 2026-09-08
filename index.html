@@ -292,9 +292,13 @@
 <aside id="playlistPanel" aria-label="Playlist">
   <header>
     <h2>🎶 Ma playlist</h2>
-    <label class="plHeadBtn" title="Importer tes propres fichiers audio (session en cours uniquement)">
+    <label class="plHeadBtn" title="Importer tes propres fichiers audio (conservés sur ton appareil)">
       📁 Importer
       <input id="importInput" type="file" accept="audio/*" multiple hidden>
+    </label>
+    <label class="plHeadBtn" title="Importer un dossier entier de musique">
+      📂 Dossier
+      <input id="importFolder" type="file" accept="audio/*" webkitdirectory multiple hidden>
     </label>
     <button class="plHeadBtn" id="clearPl">Tout effacer</button>
     <button class="plHeadBtn" id="closePl">✕</button>
@@ -556,7 +560,7 @@ function startCurrent() {
   audio.play().catch(() => {});
   $("#pTitle").textContent = t.trackName || "—";
   $("#pArtist").textContent = t.artistName || "";
-  const art = thumbArt(t.artworkUrl100);
+  const art = t.artworkUrl100 ? (t.isLocal ? t.artworkUrl100 : thumbArt(t.artworkUrl100)) : null;
   $("#pArt").src = art || "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
   markActive(t.trackId);
 }
@@ -650,9 +654,7 @@ function loadPlaylist() {
   } catch { state.playlist = []; }
 }
 function savePlaylist() {
-  // Les fichiers importés (blob:) ne survivent pas au rechargement : non persistés
-  const persist = state.playlist.filter(t => !t.isLocal);
-  try { localStorage.setItem(PL_KEY, JSON.stringify(persist)); } catch {}
+  try { localStorage.setItem(PL_KEY, JSON.stringify(state.playlist)); } catch {}
 }
 
 function addToPlaylist(track) {
@@ -677,12 +679,12 @@ function renderPlaylist() {
   ul.innerHTML = state.playlist.map((t, i) => `
     <li data-tid="${t.trackId}" data-i="${i}">
       ${t.artworkUrl100
-        ? `<img src="${esc(thumbArt(t.artworkUrl100))}" alt="">`
+        ? `<img src="${esc(t.isLocal ? t.artworkUrl100 : thumbArt(t.artworkUrl100))}" alt="">`
         : `<div class="thumb">🎵</div>`}
       <div class="plMeta">
         <div class="t">${esc(t.trackName)}</div>
-        <div class="a">${esc(t.artistName)}${t.trackTimeMillis ? " · " + fmtMs(t.trackTimeMillis) : ""}</div>
-        ${t.previewUrl ? "" : `<div class="noprev">Aucun extrait disponible</div>`}
+        <div class="a">${esc(t.artistName)}${t.trackTimeMillis ? " · " + fmtMs(t.trackTimeMillis) : ""}${t.isLocal ? " · 💾" : ""}</div>
+        ${t.previewUrl ? "" : `<div class="noprev">${t._missing ? "Fichier introuvable" : "Aucun extrait disponible"}</div>`}
       </div>
       <button class="rm" data-rm="${i}" title="Retirer">✕</button>
     </li>`).join("");
@@ -693,6 +695,8 @@ function renderPlaylist() {
 $("#playlist").addEventListener("click", e => {
   const rm = e.target.closest("[data-rm]");
   if (rm) {
+    const t = state.playlist[+rm.dataset.rm];
+    if (t && t.isLocal) { dbDel(t.trackId).catch(() => {}); }
     state.playlist.splice(+rm.dataset.rm, 1);
     savePlaylist(); renderPlaylist();
     return;
@@ -702,29 +706,177 @@ $("#playlist").addEventListener("click", e => {
 });
 
 $("#clearPl").addEventListener("click", () => {
+  // Supprime aussi les fichiers locaux du stockage IndexedDB
+  state.playlist.filter(t => t.isLocal).forEach(t => dbDel(t.trackId).catch(() => {}));
   state.playlist = []; savePlaylist(); renderPlaylist();
 });
 $("#playlistToggle").addEventListener("click", () => $("#playlistPanel").classList.toggle("open"));
 $("#closePl").addEventListener("click", () => $("#playlistPanel").classList.remove("open"));
 function openPlaylist() { $("#playlistPanel").classList.add("open"); }
 
-/* Import de fichiers audio locaux (droits détenus par l'utilisateur) */
-$("#importInput").addEventListener("change", e => {
-  [...e.target.files].forEach(f => {
+/* ============================================================
+   BIBLIOTHÈQUE LOCALE — fichiers MP3 de l'utilisateur
+   - Stockage persistant dans IndexedDB (les fichiers restent
+     sur l'appareil, même après fermeture du navigateur)
+   - Lecture des tags ID3 (titre, artiste, album, jaquette)
+   ============================================================ */
+
+const DB_NAME = "mdm_library", DB_STORE = "files";
+let _db = null;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    if (_db) return res(_db);
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE);
+    req.onsuccess = e => { _db = e.target.result; res(_db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+async function dbPut(key, blob) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).put(blob, key);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+async function dbGet(key) {
+  const db = await openDB();
+  return new Promise((res) => {
+    const rq = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(key);
+    rq.onsuccess = () => res(rq.result || null);
+    rq.onerror = () => res(null);
+  });
+}
+async function dbDel(key) {
+  const db = await openDB();
+  return new Promise((res) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).delete(key);
+    tx.oncomplete = res; tx.onerror = res;
+  });
+}
+
+/* Lit les tags ID3v2 d'un MP3 (titre, artiste, album, jaquette APIC) */
+function readID3(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const dv = new DataView(reader.result);
+        if (dv.getUint8(0) !== 0x49 || dv.getUint8(1) !== 0x44 || dv.getUint8(2) !== 0x33) return resolve({}); // pas de "ID3"
+        const size = ((dv.getUint8(6) & 127) << 21) | ((dv.getUint8(7) & 127) << 14)
+                   | ((dv.getUint8(8) & 127) << 7) | (dv.getUint8(9) & 127);
+        let pos = 10;
+        const out = {};
+        const dec = new TextDecoder("utf-8", { fatal: false });
+        const decIso = new TextDecoder("iso-8859-1", { fatal: false });
+        while (pos + 10 < size + 10 && pos + 10 < dv.byteLength) {
+          const id = String.fromCharCode(dv.getUint8(pos), dv.getUint8(pos+1), dv.getUint8(pos+2), dv.getUint8(pos+3));
+          if (!/^[A-Z0-9]{4}$/.test(id)) break;
+          const fsize = (dv.getUint8(pos+4) << 24) | (dv.getUint8(pos+5) << 16) | (dv.getUint8(pos+6) << 8) | dv.getUint8(pos+7);
+          if (fsize <= 0 || pos + 10 + fsize > dv.byteLength) break;
+          const start = pos + 10;
+          if (id === "TIT2" || id === "TPE1" || id === "TALB") {
+            const enc = dv.getUint8(start);
+            const raw = new Uint8Array(reader.result, start + 1, fsize - 1);
+            const txt = (enc === 0 ? decIso : dec).decode(raw).replace(/\0+$/g, "").trim();
+            if (id === "TIT2") out.title = txt;
+            if (id === "TPE1") out.artist = txt;
+            if (id === "TALB") out.album = txt;
+          } else if (id === "APIC") {
+            // image : enc(1) + mime(\0) + type(1) + desc(\0) + data
+            let p = start + 1;
+            while (dv.getUint8(p) !== 0 && p < start + fsize) p++; p++; // skip mime
+            p++; // skip type
+            const enc = dv.getUint8(start);
+            if (enc === 0 || enc === 3) { while (dv.getUint8(p) !== 0 && p < start + fsize) p++; p++; }
+            else { while ((dv.getUint8(p) !== 0 || dv.getUint8(p+1) !== 0) && p < start + fsize) p += 2; p += 2; }
+            const imgLen = start + fsize - p;
+            if (imgLen > 100) {
+              const blob = new Blob([new Uint8Array(reader.result, p, imgLen)]);
+              out.cover = URL.createObjectURL(blob);
+            }
+          }
+          pos = start + fsize;
+        }
+        resolve(out);
+      } catch { resolve({}); }
+    };
+    reader.onerror = () => resolve({});
+    reader.readAsArrayBuffer(file.slice(0, 2 * 1024 * 1024)); // 2 Mo suffisent pour les tags
+  });
+}
+
+/* Durée d'un fichier audio via un élément temporaire */
+function getAudioDuration(url) {
+  return new Promise(resolve => {
+    const a = new Audio();
+    a.preload = "metadata";
+    a.onloadedmetadata = () => resolve(Math.round(a.duration * 1000));
+    a.onerror = () => resolve(null);
+    setTimeout(() => resolve(null), 5000);
+    a.src = url;
+  });
+}
+
+/* Import d'une liste de fichiers audio */
+async function importFiles(fileList) {
+  const files = [...fileList].filter(f => /audio|\.(mp3|m4a|aac|ogg|opus|wav|flac|webm)$/i.test(f.type + " " + f.name));
+  if (!files.length) { alert("Aucun fichier audio détecté."); return; }
+  openPlaylist();
+  const ul = $("#playlist");
+  const info = document.createElement("div");
+  info.className = "plEmpty";
+  info.textContent = "⏳ Import de " + files.length + " fichier(s)…";
+  ul.prepend(info);
+  let done = 0;
+  for (const f of files) {
+    const id = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    const blobUrl = URL.createObjectURL(f);
+    const [tags, dur] = await Promise.all([readID3(f), getAudioDuration(blobUrl)]);
+    try { await dbPut(id, f); } catch {}
     state.playlist.unshift({
-      trackId: "local-" + Date.now() + "-" + Math.random().toString(36).slice(2),
-      trackName: f.name.replace(/\.[^.]+$/, ""),
-      artistName: "Fichier local",
-      collectionName: "Import local",
-      artworkUrl100: null,
-      previewUrl: URL.createObjectURL(f),
-      trackTimeMillis: null,
+      trackId: id,
+      trackName: tags.title || f.name.replace(/\.[^.]+$/, ""),
+      artistName: tags.artist || "Fichier local",
+      collectionName: tags.album || "Ma bibliothèque",
+      artworkUrl100: tags.cover || null,
+      previewUrl: blobUrl,
+      trackTimeMillis: dur,
       isLocal: true,
     });
-  });
-  savePlaylist(); renderPlaylist(); openPlaylist();
-  e.target.value = "";
-});
+    done++;
+    info.textContent = "⏳ Import " + done + "/" + files.length + "…";
+    renderPlaylist(); ul.prepend(info);
+  }
+  info.remove();
+  savePlaylist(); renderPlaylist();
+}
+
+/* Recharge les URLs des fichiers locaux au démarrage (les blob: ne survivent pas) */
+async function restoreLocalUrls() {
+  let changed = false;
+  for (const t of state.playlist) {
+    if (t.isLocal) {
+      const blob = await dbGet(t.trackId).catch(() => null);
+      if (blob) {
+        // recrée une URL de lecture valide
+        if (t.previewUrl) { /* l'ancienne est morte */ }
+        t.previewUrl = URL.createObjectURL(blob);
+        changed = true;
+      } else {
+        t.previewUrl = null; // fichier supprimé du stockage
+        t._missing = true;
+      }
+    }
+  }
+  if (changed) renderPlaylist();
+}
+
+$("#importInput").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
+$("#importFolder").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
 
 /* ============================================================
    BARRE DE RECHERCHE, ONGLETS, ORIGINE, GENRES
@@ -766,6 +918,7 @@ $("#genres").addEventListener("click", e => {
 /* ---------- Initialisation ---------- */
 loadPlaylist();
 renderPlaylist();
+restoreLocalUrls(); // recharge les fichiers locaux persistés (IndexedDB)
 </script>
 </body>
 </html>

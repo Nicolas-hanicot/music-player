@@ -229,9 +229,49 @@
     border:1px solid #ffffff10}
   .legalLink:hover{color:var(--accent2);border-color:var(--accent2)}
 
+  /* ---------- Media player étendu ---------- */
+  #player.expanded{height:auto;flex-wrap:wrap;padding:14px 18px}
+  .pSkip{display:none;gap:4px;align-items:center}
+  #player.expanded .pSkip{display:flex}
+  .pSkip button{width:38px;height:38px;font-size:.85rem}
+  .pExtras{display:flex;gap:8px;align-items:center;flex:none}
+  .pExtras button,.pExtras select{
+    padding:6px 10px;border-radius:8px;background:var(--panel2);border:1px solid #ffffff1c;
+    font-size:.78rem;color:var(--text);
+  }
+  .pExtras button:hover,.pExtras select:hover{border-color:var(--accent2)}
+  #speedSel{width:auto}
+  #queueToggle.on{border-color:var(--accent2);color:var(--accent2)}
+
+  /* File d'attente (up next) */
+  #queuePanel{
+    position:fixed;left:0;right:0;bottom:92px;z-index:24;max-height:0;overflow:hidden;
+    background:rgba(20,23,30,.97);backdrop-filter:blur(14px);border-top:1px solid #ffffff14;
+    transition:max-height .3s ease;
+  }
+  #queuePanel.open{max-height:280px;overflow-y:auto}
+  #queuePanel h3{padding:10px 18px 4px;font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  #queue{list-style:none;padding:0 10px 10px}
+  #queue li{display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:8px;cursor:pointer}
+  #queue li:hover{background:#ffffff0d}
+  #queue li.playing{background:#7c5cff22}
+  #queue li img,#queue li .thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;flex:none}
+  #queue li .thumb{display:flex;align-items:center;justify-content:center;font-size:.9rem;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2))}
+  #queue .qT{flex:1;min-width:0;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #queue .qA{font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #queue .qD{font-size:.7rem;color:var(--muted);flex:none}
+
+  /* Visualiseur audio (barres animées) */
+  #viz{display:none;align-items:flex-end;gap:2px;height:24px;flex:none}
+  #player.expanded #viz{display:flex}
+  #viz span{width:3px;background:linear-gradient(180deg,var(--accent2),var(--accent1));
+    border-radius:2px;height:4px;transition:height .1s}
+
   @media (max-width:760px){
     .pMeta{display:none}
     #vol{width:60px}
+    #viz{display:none!important}
     .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
   }
 </style>
@@ -313,22 +353,42 @@
     <div id="pArtist">—</div>
   </div>
   <div class="pControls">
-    <button id="shuffleBtn" title="Lecture aléatoire">🔀</button>
-    <button id="prevBtn" title="Précédent">⏮</button>
-    <button id="playBtn" title="Lecture / Pause">▶</button>
-    <button id="nextBtn" title="Suivant">⏭</button>
-    <button id="repeatBtn" title="Répéter : tout / un morceau / désactivé">🔁</button>
+    <button id="shuffleBtn" title="Lecture aléatoire (S)">🔀</button>
+    <button id="prevBtn" title="Précédent (←)">⏮</button>
+    <span class="pSkip"><button id="back10" title="Reculer 10 s">⏪</button></span>
+    <button id="playBtn" title="Lecture / Pause (Espace)">▶</button>
+    <span class="pSkip"><button id="fwd10" title="Avancer 10 s">⏩</button></span>
+    <button id="nextBtn" title="Suivant (→)">⏭</button>
+    <button id="repeatBtn" title="Répéter : tout / un morceau / désactivé (R)">🔁</button>
   </div>
   <div class="pProgress">
     <span id="tCur">0:00</span>
     <input type="range" id="seek" min="0" max="0" step="0.1" value="0">
     <span id="tDur">0:00</span>
   </div>
+  <div id="viz" title="Visualiseur"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  <div class="pExtras">
+    <select id="speedSel" title="Vitesse de lecture">
+      <option value="0.5">0.5×</option>
+      <option value="0.75">0.75×</option>
+      <option value="1" selected>1×</option>
+      <option value="1.25">1.25×</option>
+      <option value="1.5">1.5×</option>
+      <option value="2">2×</option>
+    </select>
+    <button id="queueToggle" title="File d'attente (Q)">📋</button>
+    <button id="expandBtn" title="Agrandir / réduire le lecteur (E)">⤢</button>
+  </div>
   <div class="pVol">
-    <button id="muteBtn" title="Muet">🔊</button>
+    <button id="muteBtn" title="Muet (M)">🔊</button>
     <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
   </div>
 </footer>
+
+<section id="queuePanel" aria-label="File d'attente">
+  <h3>📋 File d'attente</h3>
+  <ul id="queue"></ul>
+</section>
 
 <a class="legalLink" href="mentions-legales.html">Mentions légales</a>
 
@@ -643,6 +703,116 @@ $("#muteBtn").addEventListener("click", () => {
   $("#muteBtn").textContent = audio.muted ? "🔇" : "🔊";
 });
 audio.volume = 0.8;
+
+/* ============================================================
+   MEDIA PLAYER AVANCÉ — file d'attente, vitesse, ±10s, clavier
+   ============================================================ */
+
+/* Avance / recul de 10 secondes */
+$("#back10").addEventListener("click", () => { audio.currentTime = Math.max(0, audio.currentTime - 10); });
+$("#fwd10").addEventListener("click", () => { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); });
+
+/* Vitesse de lecture */
+$("#speedSel").addEventListener("change", e => { audio.playbackRate = +e.target.value; });
+
+/* Agrandir / réduire le lecteur */
+$("#expandBtn").addEventListener("click", () => {
+  $("#player").classList.toggle("expanded");
+  $("#expandBtn").textContent = $("#player").classList.contains("expanded") ? "⤡" : "⤢";
+});
+
+/* File d'attente (up next) */
+$("#queueToggle").addEventListener("click", () => {
+  $("#queuePanel").classList.toggle("open");
+  $("#queueToggle").classList.toggle("on", $("#queuePanel").classList.contains("open"));
+  renderQueue();
+});
+
+function renderQueue() {
+  const ul = $("#queue");
+  if (!state.queue.length) {
+    ul.innerHTML = `<li style="color:var(--muted);cursor:default">File d'attente vide — lance un morceau 🎵</li>`;
+    return;
+  }
+  ul.innerHTML = state.queue.map((t, i) => `
+    <li data-qi="${i}" class="${i === state.index ? "playing" : ""}">
+      ${t.artworkUrl100
+        ? `<img src="${esc(t.isLocal ? t.artworkUrl100 : thumbArt(t.artworkUrl100))}" alt="">`
+        : `<div class="thumb">🎵</div>`}
+      <div style="flex:1;min-width:0">
+        <div class="qT">${i === state.index ? "▶ " : ""}${esc(t.trackName)}</div>
+        <div class="qA">${esc(t.artistName)}</div>
+      </div>
+      <span class="qD">${fmtMs(t.trackTimeMillis)}</span>
+    </li>`).join("");
+}
+$("#queue").addEventListener("click", e => {
+  const li = e.target.closest("li[data-qi]");
+  if (li) { state.index = +li.dataset.qi; startCurrent(); renderQueue(); }
+});
+
+/* Met à jour la file d'attente à chaque changement de morceau */
+const _startCurrent = startCurrent;
+startCurrent = function () {
+  _startCurrent();
+  renderQueue();
+  if ("mediaSession" in navigator) {
+    const t = state.queue[state.index];
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: t.trackName || "", artist: t.artistName || "", album: t.collectionName || "",
+        artwork: t.artworkUrl100 ? [{ src: t.isLocal ? t.artworkUrl100 : bigArt(t.artworkUrl100), sizes: "300x300" }] : [],
+      });
+      navigator.mediaSession.setActionHandler("previoustrack", () => step(-1));
+      navigator.mediaSession.setActionHandler("nexttrack", () => step(1));
+    } catch {}
+  }
+};
+
+/* Visualiseur audio (barres animées via Web Audio API) */
+let vizCtx = null, vizAnalyser = null, vizRAF = null;
+function startViz() {
+  try {
+    if (!vizCtx) {
+      vizCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = vizCtx.createMediaElementSource(audio);
+      vizAnalyser = vizCtx.createAnalyser();
+      vizAnalyser.fftSize = 64;
+      src.connect(vizAnalyser);
+      vizAnalyser.connect(vizCtx.destination);
+    }
+    if (vizCtx.state === "suspended") vizCtx.resume();
+    const bars = document.querySelectorAll("#viz span");
+    const data = new Uint8Array(vizAnalyser.frequencyBinCount);
+    cancelAnimationFrame(vizRAF);
+    (function loop() {
+      vizAnalyser.getByteFrequencyData(data);
+      bars.forEach((b, i) => {
+        const v = data[Math.floor(i * data.length / bars.length)] / 255;
+        b.style.height = Math.max(4, v * 24) + "px";
+      });
+      vizRAF = requestAnimationFrame(loop);
+    })();
+  } catch { /* visualiseur non supporté : on cache */ }
+}
+audio.addEventListener("play", startViz);
+
+/* Raccourcis clavier du media player */
+document.addEventListener("keydown", e => {
+  // Ignore si on tape dans un champ de saisie
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (e.key === " ") { e.preventDefault(); $("#playBtn").click(); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); audio.volume = Math.min(1, audio.volume + .05); $("#vol").value = audio.volume; }
+  else if (e.key === "ArrowDown") { e.preventDefault(); audio.volume = Math.max(0, audio.volume - .05); $("#vol").value = audio.volume; }
+  else if (k === "m") { $("#muteBtn").click(); }
+  else if (k === "s") { $("#shuffleBtn").click(); }
+  else if (k === "r") { $("#repeatBtn").click(); }
+  else if (k === "q") { $("#queueToggle").click(); }
+  else if (k === "e") { $("#expandBtn").click(); }
+});
 
 /* ============================================================
    PLAYLIST LOCALE (localStorage)

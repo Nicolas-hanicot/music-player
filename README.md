@@ -1,4 +1,4 @@
-# Le Monde de la Musique — Music Codex
+# Music du Monde — Music Codex
 
 Application web musicale en **une seule page** (aucune installation, aucun serveur).
 Ouvre `index.html` dans un navigateur moderne (Chrome, Edge, Firefox…).

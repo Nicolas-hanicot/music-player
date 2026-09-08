@@ -617,7 +617,14 @@ function startCurrent() {
   const t = state.queue[state.index];
   if (!t) return;
   audio.src = t.previewUrl;
-  audio.play().catch(() => {});
+  audio.play().catch(err => {
+    // Détecte un navigateur incapable de lire le format AAC/M4A (extraits iTunes)
+    if (err && err.name === "NotSupportedError") {
+      $("#pTitle").textContent = "⚠️ Format non lu par ce navigateur";
+      $("#pArtist").textContent = "Ouvre le site dans Chrome, Edge ou Firefox pour le son";
+      showAudioWarning();
+    }
+  });
   $("#pTitle").textContent = t.trackName || "—";
   $("#pArtist").textContent = t.artistName || "";
   const art = t.artworkUrl100 ? (t.isLocal ? t.artworkUrl100 : thumbArt(t.artworkUrl100)) : null;
@@ -670,6 +677,33 @@ $("#repeatBtn").addEventListener("click", () => {
 $("#shuffleBtn").addEventListener("click", () => {
   state.shuffle = !state.shuffle;
   updateModeBtns();
+});
+
+/* Avertissement si le navigateur ne lit pas les extraits AAC d'iTunes */
+let _audioWarned = false;
+function showAudioWarning() {
+  if (_audioWarned) return;
+  _audioWarned = true;
+  const box = document.createElement("div");
+  box.style.cssText = "position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:40;" +
+    "background:#3a2b10;border:1px solid #f5a623;color:#ffd98e;padding:14px 20px;border-radius:12px;" +
+    "max-width:min(560px,92vw);font-size:.88rem;box-shadow:0 10px 30px #000a;line-height:1.5";
+  box.innerHTML = "🔇 <strong>Le son ne sort pas dans ce navigateur.</strong><br>" +
+    "Les extraits iTunes sont au format AAC/M4A, non décodé par certains navigateurs " +
+    "(notamment l'aperçu intégré à VS Code).<br><br>" +
+    "✅ <strong>Solution :</strong> ouvre le site dans <strong>Chrome, Edge ou Firefox</strong> → le son fonctionne.<br>" +
+    "💾 Ta <strong>bibliothèque MP3</strong> (📁 Importer) fonctionne, elle, partout !";
+  const close = document.createElement("button");
+  close.textContent = "✕";
+  close.style.cssText = "position:absolute;top:6px;right:10px;background:none;border:none;color:#ffd98e;cursor:pointer;font-size:1rem";
+  close.onclick = () => box.remove();
+  box.appendChild(close);
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 20000);
+}
+/* Détecte aussi via l'erreur de l'élément audio */
+audio.addEventListener("error", () => {
+  if (audio.error && audio.error.code === 4 && audio.src) showAudioWarning();
 });
 
 $("#playBtn").addEventListener("click", () => {

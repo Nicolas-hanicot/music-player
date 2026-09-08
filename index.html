@@ -3,9 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Le Monde de la Musique — explore le catalogue musical mondial (iTunes), écoute des extraits et crée ta playlist locale.">
+<meta name="description" content="Le Monde de la Musique — application musicale gratuite : recherche de titres, artistes et albums (catalogue iTunes), extraits audio, musique libre et playlist. Sans inscription.">
+<meta name="keywords" content="musique, écouter musique, recherche musique, titres, artistes, albums, extraits audio, playlist, musique libre, gratuit, streaming, iTunes, Jamendo">
+<meta name="author" content="Nicolas Hanicot">
+<meta name="theme-color" content="#0e1014">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="canonical" href="https://nicolas475-py.github.io/le-monde-de-la-musique/">
+
+<!-- Données structurées Schema.org : aide Google à comprendre et afficher le site -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Le Monde de la Musique",
+  "alternateName": "Music Codex",
+  "url": "https://nicolas475-py.github.io/le-monde-de-la-musique/",
+  "description": "Application musicale gratuite : recherche de titres, artistes et albums, écoute d'extraits audio, musique libre et playlist locale.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Web",
+  "inLanguage": "fr",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "author": { "@type": "Person", "name": "Nicolas Hanicot" },
+  "browserRequirements": "Requires HTML5 and JavaScript"
+}
+</script>
 
 <!-- Partage réseaux sociaux (Open Graph / Facebook / LinkedIn / WhatsApp) -->
 <meta property="og:type" content="website">
@@ -25,7 +47,7 @@
 <meta name="twitter:description" content="Explore le catalogue musical mondial : titres, artistes, albums, extraits audio et playlist. Gratuit et sans inscription !">
 <meta name="twitter:image" content="https://nicolas475-py.github.io/le-monde-de-la-musique/og-image.jpg">
 
-<title>Le Monde de la Musique — Music Codex</title>
+<title>Le Monde de la Musique — Écouter & chercher de la musique gratuitement</title>
 <style>
   :root{
     --bg:#0e1014; --panel:#171a21; --panel2:#1e222c; --text:#eef1f6; --muted:#9aa3b2;
@@ -260,6 +282,7 @@
   <section id="results" class="grid">
     <div class="welcome">
       <h2>Bienvenue 👋</h2>
+      <h1 style="font-size:1.05rem;font-weight:600;color:var(--muted);margin:8px 0 12px">Écoute et recherche de la musique gratuitement : titres, artistes, albums, extraits audio et playlist</h1>
       <p>Tape un titre, un artiste ou un album dans la barre de recherche,<br>
       ou explore le catalogue par genre et par pays d'origine.<br><br>
       🎧 <strong>Extraits</strong> ~30 s via iTunes · 🆓 <strong>Morceaux complets</strong> dans l'onglet « Musique libre »<br>

@@ -148,8 +148,6 @@
     font-size:.75rem;color:var(--text);text-decoration:none;text-align:center;
   }
   .full:hover{border-color:var(--accent2);color:var(--accent2)}
-  .full.free{border-color:#2ecc7155;color:#2ecc71}
-  .full.free:hover{background:#2ecc7122}
   .add{padding:8px 12px;border-radius:8px;background:var(--panel2);border:1px solid #ffffff1c;font-size:.9rem}
   .add:hover{border-color:var(--accent2);color:var(--accent2)}
   .pControls button.on{border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 0 2px #00d4ff33}
@@ -251,7 +249,6 @@
       <button data-entity="song" class="active">Titres</button>
       <button data-entity="musicArtist">Artistes</button>
       <button data-entity="album">Albums</button>
-      <button data-entity="free">🆓 Musique libre</button>
     </div>
     <select id="countrySelect" title="Origine / plateforme iTunes">
       <option value="FR" selected>🇫🇷 France</option>
@@ -286,7 +283,7 @@
       <h1 style="font-size:1.05rem;font-weight:600;color:var(--muted);margin:8px 0 12px">Écoute et recherche de la musique gratuitement : titres, artistes, albums, extraits audio et playlist</h1>
       <p>Tape un titre, un artiste ou un album dans la barre de recherche,<br>
       ou explore le catalogue par genre et par pays d'origine.<br><br>
-      🎧 <strong>Extraits</strong> ~30 s via iTunes · 🆓 <strong>Morceaux complets</strong> dans l'onglet « Musique libre »<br>
+      🎧 <strong>Extraits</strong> ~30 s via iTunes ·
       🔗 Bouton « Écouter en entier » → ouvre le titre sur Apple Music</p>
     </div>
   </section>
@@ -346,7 +343,7 @@ const audio = $("#audio");
 const PL_KEY = "mdm_playlist_v1";
 
 const state = {
-  entity: "song",        // song | musicArtist | album | free
+  entity: "song",        // song | musicArtist | album
   country: "FR",         // plateforme iTunes (origine)
   results: [],           // résultats courants
   queue: [],             // file de lecture
@@ -356,56 +353,6 @@ const state = {
   repeatMode: 0,         // 0 = non, 1 = répéter tout, 2 = répéter un
   shuffle: false,        // lecture aléatoire
 };
-
-/* Jamendo : musique libre (Creative Commons) — morceaux COMPLETS et légaux.
-   La clé publique ci-dessous a un quota limité et partagé : pour un usage
-   illimité, crée ta propre clé gratuite sur https://devportal.jamendo.com
-   (2 min, sans CB) et remplace-la ici. */
-const JAMENDO_ID = "b6747d04"; // ⚠️ remplace par TA clé si quota dépassé
-
-/* Recherche Jamendo : morceaux complets, licence Creative Commons */
-function searchJamendo(term) {
-  const box = $("#results");
-  box.innerHTML = `<div class="spinner">Recherche de musique libre…</div>`;
-  $("#resultsInfo").textContent = "";
-  const url = "https://api.jamendo.com/v3.0/tracks/"
-    + "?client_id=" + JAMENDO_ID
-    + "&format=json&limit=200"
-    + "&search=" + encodeURIComponent(term)
-    + "&include=musicinfo&audioformat=mp32";
-  fetch(url)
-    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(data => {
-      const warn = (data.headers && data.headers.warnings) || "";
-      if ((data.results || []).length === 0 && /usage limits/i.test(warn)) {
-        box.innerHTML = `<div class="errorBox">⚠️ Le quota de la clé Jamendo de démonstration est épuisé.<br><br>
-          <strong>Pour activer la musique libre illimitée (gratuit, 2 min) :</strong><br>
-          1. Va sur <a href="https://devportal.jamendo.com" target="_blank" rel="noopener" style="color:var(--accent2)">devportal.jamendo.com</a><br>
-          2. Crée un compte puis une application → copie ton <em>Client ID</em><br>
-          3. Remplace <code>JAMENDO_ID</code> dans index.html (ligne ~640)<br><br>
-          Les morceaux Jamendo sont 100 % légaux et COMPLETS (Creative Commons).</div>`;
-        $("#resultsInfo").textContent = "";
-        state.results = [];
-        return;
-      }
-      state.results = (data.results || []).map(j => ({
-        trackId: "jam-" + j.id,
-        trackName: j.name,
-        artistName: j.artist_name,
-        collectionName: j.album_name,
-        artworkUrl100: j.album_image || j.image || null,
-        previewUrl: j.audio,           // morceau COMPLET (pas un extrait)
-        trackTimeMillis: j.duration ? j.duration * 1000 : null,
-        primaryGenreName: (j.musicinfo && j.musicinfo.tags && j.musicinfo.tags.genres || [])[0] || "Libre",
-        trackViewUrl: j.shareurl || null,
-        isFree: true,
-      }));
-      renderResults();
-    })
-    .catch(err => {
-      box.innerHTML = `<div class="errorBox">⚠️ Erreur Jamendo : ${esc(err.message)}</div>`;
-    });
-}
 
 /* ---------- Utilitaires ---------- */
 const esc = s => (s ?? "").toString().replace(/[&<>"']/g,
@@ -445,10 +392,6 @@ function doSearch(term) {
   term = (term || "").trim();
   if (term.length < 2) return;
   state.lastTerm = term;
-
-  // Onglet Musique libre → API Jamendo (morceaux complets Creative Commons)
-  if (state.entity === "free") { searchJamendo(term); return; }
-
   const box = $("#results");
   box.innerHTML = `<div class="spinner">Recherche en cours…</div>`;
   $("#resultsInfo").textContent = "";
@@ -501,13 +444,10 @@ function renderResults(customInfo) {
 
   $("#resultsInfo").textContent = customInfo
     ? customInfo + " — " + list.length + " résultat(s)"
-    : (state.entity === "free"
-        ? list.length + " morceau(x) COMPLETS — musique libre (Creative Commons) 🆓"
-        : list.length + " résultat(s) — catalogue " + state.country);
+    : list.length + " résultat(s) — catalogue " + state.country;
 
   if (state.entity === "musicArtist") { renderArtists(box, list); return; }
   if (state.entity === "album")       { renderAlbums(box, list);  return; }
-  if (state.entity === "free")        { renderTracks(box, list);  return; }
   renderTracks(box, list.filter(x => x.wrapperType === "track" || x.kind === "song"));
 }
 
@@ -518,19 +458,16 @@ function renderTracks(box, tracks) {
   }
   box.innerHTML = tracks.map((t, i) => {
     const noPrev = !t.previewUrl;
-    const free = !!t.isFree;
-    const fullBtn = free
-      ? `<span class="full free">🆓 Morceau complet</span>`
-      : (t.trackViewUrl
-          ? `<a class="full" href="${esc(t.trackViewUrl)}" target="_blank" rel="noopener" title="Ouvre sur Apple Music">🎵 Écouter en entier ↗</a>`
-          : "");
+    const fullBtn = t.trackViewUrl
+      ? `<a class="full" href="${esc(t.trackViewUrl)}" target="_blank" rel="noopener" title="Ouvre sur Apple Music">🎵 Écouter en entier ↗</a>`
+      : "";
     return `
     <article class="card" data-tid="${t.trackId}">
       <div class="art">
         <img loading="lazy" src="${esc(bigArt(t.artworkUrl100) || "")}" alt=""
              onerror="this.outerHTML='<div class=placeholder>🎵</div>'">
         <button class="playOverlay" data-action="play" data-i="${i}" ${noPrev ? "disabled" : ""}
-                title="${noPrev ? "Aucun audio disponible" : "Écouter"}">▶</button>
+                title="${noPrev ? "Aucun extrait disponible" : "Écouter l'extrait"}">▶</button>
       </div>
       <h3 title="${esc(t.trackName)}">${esc(t.trackName)}</h3>
       <p>${esc(t.artistName)}</p>
@@ -542,7 +479,7 @@ function renderTracks(box, tracks) {
       ${fullBtn}
       <div class="actions">
         <button class="listen" data-action="play" data-i="${i}" ${noPrev ? "disabled" : ""}>
-          ${noPrev ? "Pas d'audio" : (free ? "▶ Écouter (complet)" : "▶ Extrait")}
+          ${noPrev ? "Pas d'extrait" : "▶ Extrait"}
         </button>
         <button class="add" data-action="add" data-i="${i}" title="Ajouter à la playlist">＋</button>
       </div>
@@ -583,9 +520,7 @@ $("#results").addEventListener("click", e => {
   if (!btn) return;
   const action = btn.dataset.action;
 
-  const tracks = state.entity === "free"
-    ? state.results
-    : state.results.filter(x => x.wrapperType === "track" || x.kind === "song");
+  const tracks = state.results.filter(x => x.wrapperType === "track" || x.kind === "song");
 
   if (action === "play" && !btn.disabled) {
     const playable = tracks.filter(t => t.previewUrl);
@@ -728,7 +663,6 @@ function addToPlaylist(track) {
     collectionName: track.collectionName, artworkUrl100: track.artworkUrl100,
     previewUrl: track.previewUrl, trackTimeMillis: track.trackTimeMillis,
     primaryGenreName: track.primaryGenreName, trackViewUrl: track.trackViewUrl,
-    isFree: !!track.isFree,
   });
   savePlaylist(); renderPlaylist(); openPlaylist();
 }

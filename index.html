@@ -148,6 +148,9 @@
     font-size:.75rem;color:var(--text);text-decoration:none;text-align:center;
   }
   .full:hover{border-color:var(--accent2);color:var(--accent2)}
+  .spotifyBtn{display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border-radius:8px;
+    background:#1db954;color:#061b0d;font-size:.75rem;font-weight:700;text-decoration:none}
+  .spotifyBtn:hover{background:#1ed760}
   .add{padding:8px 12px;border-radius:8px;background:var(--panel2);border:1px solid #ffffff1c;font-size:.9rem}
   .add:hover{border-color:var(--accent2);color:var(--accent2)}
   .pControls button.on{border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 0 2px #00d4ff33}
@@ -261,6 +264,18 @@
   #queue .qT{flex:1;min-width:0;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #queue .qA{font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #queue .qD{font-size:.7rem;color:var(--muted);flex:none}
+
+  #spotifyPanel{display:none;position:fixed;right:18px;bottom:112px;z-index:28;width:min(440px,calc(100vw - 36px));
+    padding:14px;background:rgba(23,26,33,.98);border:1px solid #1db95488;border-radius:14px;box-shadow:0 16px 50px #000b}
+  #spotifyPanel.open{display:block}
+  #spotifyPanel h3{font-size:.9rem;margin-bottom:8px}
+  #spotifyPanel p{font-size:.75rem;color:var(--muted);margin-bottom:10px}
+  #spotifyUrl{width:100%;padding:9px 10px;border-radius:8px;border:1px solid #ffffff22;background:var(--panel2);color:var(--text)}
+  .spotifyForm{display:flex;gap:8px;margin-bottom:10px}
+  #loadSpotify{padding:9px 12px;border-radius:8px;background:#1db954;color:#061b0d;font-weight:700;white-space:nowrap}
+  #closeSpotify{position:absolute;right:10px;top:8px;color:var(--muted)}
+  #spotifyEmbed{width:100%;height:152px;border:0;border-radius:10px;display:none}
+  .spotifyVolumeNote{font-size:.72rem;color:var(--muted);margin-top:8px}
 
   /* Visualiseur audio (barres animées) */
   #viz{display:none;align-items:flex-end;gap:2px;height:24px;flex:none}
@@ -377,6 +392,7 @@
       <option value="2">2×</option>
     </select>
     <button id="queueToggle" title="File d'attente (Q)">📋</button>
+    <button id="spotifyToggle" title="Lecteur Spotify officiel">🟢</button>
     <button id="expandBtn" title="Agrandir / réduire le lecteur (E)">⤢</button>
   </div>
   <div class="pVol">
@@ -390,9 +406,21 @@
   <ul id="queue"></ul>
 </section>
 
+<section id="spotifyPanel" aria-label="Lecteur Spotify">
+  <button id="closeSpotify" title="Fermer">✕</button>
+  <h3>🟢 Lecteur Spotify officiel</h3>
+  <p>Colle un lien Spotify vers un titre, un album ou une playlist.</p>
+  <div class="spotifyForm">
+    <input id="spotifyUrl" type="url" placeholder="https://open.spotify.com/track/...">
+    <button id="loadSpotify">Charger</button>
+  </div>
+  <iframe id="spotifyEmbed" title="Lecteur Spotify" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
+  <div class="spotifyVolumeNote">🔊 Le volume Spotify se règle dans les contrôles du lecteur Spotify. Le curseur du lecteur principal contrôle les extraits iTunes et tes fichiers locaux.</div>
+</section>
+
 <a class="legalLink" href="mentions-legales.html">Mentions légales</a>
 
-<audio id="audio" preload="metadata"></audio>
+<audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 
 <script>
 "use strict";
@@ -485,6 +513,7 @@ function loadAlbum(collectionId, albumName) {
   fetch(url)
     .then(r => r.json())
     .then(data => {
+      state.entity = "song";
       state.results = (data.results || []).filter(x => x.wrapperType === "track");
       renderResults("Pistes de l'album « " + (albumName || "") + " »");
     })
@@ -515,6 +544,36 @@ function renderResults(customInfo) {
   renderTracks(box, list.filter(x => x.wrapperType === "track" || x.kind === "song"));
 }
 
+function spotifySearchUrl(track) {
+  const query = `${track.trackName || ""} ${track.artistName || ""}`.trim();
+  return "https://open.spotify.com/search/" + encodeURIComponent(query);
+}
+
+function spotifyEmbedUrl(value) {
+  try {
+    const url = new URL(value.trim());
+    if (!/(^|\.)open\.spotify\.com$/.test(url.hostname)) return null;
+    const parts = url.pathname.split("/").filter(Boolean);
+    const typeIndex = ["track", "album", "playlist", "episode", "show"].indexOf(parts[0]);
+    if (typeIndex < 0 || !parts[1]) return null;
+    return `https://open.spotify.com/embed/${parts[0]}/${encodeURIComponent(parts[1])}?utm_source=generator`;
+  } catch { return null; }
+}
+
+$("#loadSpotify").addEventListener("click", () => {
+  const src = spotifyEmbedUrl($("#spotifyUrl").value);
+  if (!src) {
+    $("#spotifyUrl").setCustomValidity("Colle un lien Spotify open.spotify.com valide.");
+    $("#spotifyUrl").reportValidity();
+    return;
+  }
+  $("#spotifyUrl").setCustomValidity("");
+  $("#spotifyEmbed").src = src;
+  $("#spotifyEmbed").style.display = "block";
+  $("#spotifyPanel").classList.add("open");
+});
+$("#closeSpotify").addEventListener("click", () => $("#spotifyPanel").classList.remove("open"));
+
 function renderTracks(box, tracks) {
   if (!tracks.length) {
     box.innerHTML = `<div class="empty">😕 Aucun titre trouvé.</div>`;
@@ -541,6 +600,7 @@ function renderTracks(box, tracks) {
         <span>${fmtMs(t.trackTimeMillis)}</span>
       </div>
       ${fullBtn}
+      <a class="spotifyBtn" href="${spotifySearchUrl(t)}" target="_blank" rel="noopener" title="Rechercher ce titre sur Spotify">🟢 Ouvrir sur Spotify ↗</a>
       <div class="actions">
         <button class="listen" data-action="play" data-i="${i}" ${noPrev ? "disabled" : ""}>
           ${noPrev ? "Pas d'extrait" : "▶ Extrait"}
@@ -617,13 +677,17 @@ function startCurrent() {
   const t = state.queue[state.index];
   if (!t) return;
   audio.src = t.previewUrl;
+  audio.load();
   audio.play().catch(err => {
+    if (err && err.name === "AbortError") return;
     // Détecte un navigateur incapable de lire le format AAC/M4A (extraits iTunes)
     if (err && err.name === "NotSupportedError") {
       $("#pTitle").textContent = "⚠️ Format non lu par ce navigateur";
       $("#pArtist").textContent = "Ouvre le site dans Chrome, Edge ou Firefox pour le son";
       showAudioWarning();
+      return;
     }
+    $("#pArtist").textContent = "Clique sur Lecture pour démarrer le son";
   });
   $("#pTitle").textContent = t.trackName || "—";
   $("#pArtist").textContent = t.artistName || "";
@@ -642,6 +706,15 @@ function step(delta) {
   // Précédent : recommence le morceau si > 3 s écoutées
   if (delta < 0 && audio.currentTime > 3) { audio.currentTime = 0; return; }
   const n = state.queue.length;
+  if (delta > 0 && state.index >= n - 1 && state.repeatMode === 0 && !state.shuffle) {
+    audio.pause();
+    audio.currentTime = 0;
+    return;
+  }
+  if (delta < 0 && state.index <= 0 && state.repeatMode === 0 && !state.shuffle) {
+    audio.currentTime = 0;
+    return;
+  }
   for (let k = 1; k <= n; k++) {
     const i = (state.index + delta * k + n * k) % n;
     if (state.queue[i].previewUrl) { state.index = i; startCurrent(); return; }
@@ -657,6 +730,11 @@ function nextAuto() {
       state.index = playable[Math.floor(Math.random() * playable.length)];
       startCurrent(); return;
     }
+  }
+  if (state.index >= state.queue.length - 1 && state.repeatMode === 0) {
+    audio.pause();
+    audio.currentTime = 0;
+    return;
   }
   step(1);
 }
@@ -727,16 +805,22 @@ audio.addEventListener("timeupdate", () => {
 });
 $("#seek").addEventListener("input", e => { audio.currentTime = +e.target.value; });
 
+function updateVolumeIcon() {
+  $("#muteBtn").textContent = audio.muted || audio.volume === 0 ? "🔇" : audio.volume < .5 ? "🔉" : "🔊";
+}
 $("#vol").addEventListener("input", e => {
   audio.volume = +e.target.value;
   audio.muted = false;
-  $("#muteBtn").textContent = audio.volume === 0 ? "🔇" : audio.volume < .5 ? "🔉" : "🔊";
+  localStorage.setItem("mdm_volume", String(audio.volume));
+  updateVolumeIcon();
 });
 $("#muteBtn").addEventListener("click", () => {
   audio.muted = !audio.muted;
-  $("#muteBtn").textContent = audio.muted ? "🔇" : "🔊";
+  updateVolumeIcon();
 });
-audio.volume = 0.8;
+audio.volume = Number(localStorage.getItem("mdm_volume") || 0.8);
+$("#vol").value = audio.volume;
+updateVolumeIcon();
 
 /* ============================================================
    MEDIA PLAYER AVANCÉ — file d'attente, vitesse, ±10s, clavier
@@ -761,6 +845,7 @@ $("#queueToggle").addEventListener("click", () => {
   $("#queueToggle").classList.toggle("on", $("#queuePanel").classList.contains("open"));
   renderQueue();
 });
+$("#spotifyToggle").addEventListener("click", () => $("#spotifyPanel").classList.toggle("open"));
 
 function renderQueue() {
   const ul = $("#queue");

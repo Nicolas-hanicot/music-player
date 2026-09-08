@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /mentions-legales.html
 
-Sitemap: https://nicolas475-py.github.io/le-monde-de-la-musique/sitemap.xml
+Sitemap: https://nicolas475-py.github.io/music-du-monde/sitemap.xml

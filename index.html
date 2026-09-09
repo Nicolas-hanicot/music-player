@@ -58,9 +58,13 @@
   html,body{height:100%}
   body{
     font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
-    background:radial-gradient(1200px 600px at 80% -10%,#222845 0%,var(--bg) 55%) fixed,var(--bg);
+    background:var(--bg);position:relative;isolation:isolate;
     color:var(--text); padding-bottom:110px;
   }
+  body::before{content:"";position:fixed;inset:0;z-index:-2;background:
+    linear-gradient(180deg,rgba(8,10,16,.48),rgba(8,10,16,.82)),
+    url("music-player.JPEG") center/cover no-repeat;transform:scale(1.02)}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;background:rgba(8,10,16,.22);pointer-events:none}
   button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
   img{display:block}
 

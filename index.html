@@ -227,6 +227,7 @@
   .pVol{display:flex;align-items:center;gap:8px;flex:none}
   #vol{width:90px}
   #muteBtn{font-size:1.05rem;padding:6px}
+  .nativeAudio{width:230px;height:36px;flex:none;accent-color:var(--accent2)}
   .legalLink{position:absolute;right:14px;bottom:100px;font-size:.68rem;color:#6b7383;
     text-decoration:none;padding:4px 10px;border-radius:999px;background:#171a21cc;
     border:1px solid #ffffff10}
@@ -399,6 +400,7 @@
     <button id="muteBtn" title="Muet (M)">🔊</button>
     <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8">
   </div>
+  <audio id="audio" class="nativeAudio" controls preload="metadata" crossorigin="anonymous" aria-label="Lecteur audio HTML5"></audio>
 </footer>
 
 <section id="queuePanel" aria-label="File d'attente">
@@ -419,8 +421,6 @@
 </section>
 
 <a class="legalLink" href="mentions-legales.html">Mentions légales</a>
-
-<audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
 
 <script>
 "use strict";

@@ -361,6 +361,7 @@
       <input id="importFolder" type="file" accept="audio/*" webkitdirectory multiple hidden>
     </label>
     <button class="plHeadBtn" id="clearPl">Tout effacer</button>
+    <button class="plHeadBtn" id="sharePl" title="Créer un lien public vers cette playlist">🔗 Partager</button>
     <button class="plHeadBtn" id="closePl">✕</button>
   </header>
   <ul id="playlist"></ul>
@@ -985,6 +986,61 @@ function renderPlaylist() {
   if (cur) markActive(cur.trackId);
 }
 
+function publicPlaylistItems() {
+  return state.playlist.filter(t => !t.isLocal && t.trackId).map(t => ({
+    trackId: t.trackId, trackName: t.trackName, artistName: t.artistName,
+    collectionName: t.collectionName, artworkUrl100: t.artworkUrl100,
+    previewUrl: t.previewUrl, trackTimeMillis: t.trackTimeMillis,
+    primaryGenreName: t.primaryGenreName, trackViewUrl: t.trackViewUrl
+  }));
+}
+
+function encodePlaylist(items) {
+  const bytes = new TextEncoder().encode(JSON.stringify(items));
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodePlaylist(value) {
+  try {
+    const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    const items = JSON.parse(new TextDecoder().decode(bytes));
+    return Array.isArray(items) ? items.filter(t => t && t.trackId && !t.isLocal) : [];
+  } catch { return []; }
+}
+
+async function sharePlaylist() {
+  const items = publicPlaylistItems();
+  if (!items.length) {
+    alert("Ajoute d'abord un morceau du catalogue à ta playlist. Les fichiers locaux restent privés.");
+    return;
+  }
+  const url = `${location.origin}${location.pathname}#playlist=${encodePlaylist(items)}`;
+  try { await navigator.clipboard.writeText(url); }
+  catch {
+    const field = document.createElement("textarea");
+    field.value = url; document.body.appendChild(field); field.select(); document.execCommand("copy"); field.remove();
+  }
+  const button = $("#sharePl");
+  button.textContent = "✅ Lien copié";
+  setTimeout(() => { button.textContent = "🔗 Partager"; }, 2500);
+}
+
+function loadSharedPlaylist() {
+  const match = location.hash.match(/^#playlist=(.+)$/);
+  if (!match) return;
+  const shared = decodePlaylist(match[1]);
+  if (!shared.length) return;
+  state.playlist = shared;
+  savePlaylist();
+  renderPlaylist();
+  openPlaylist();
+  $("#resultsInfo").textContent = "Playlist publique partagée — " + shared.length + " morceau(x)";
+}
+
 $("#playlist").addEventListener("click", e => {
   const rm = e.target.closest("[data-rm]");
   if (rm) {
@@ -1003,6 +1059,7 @@ $("#clearPl").addEventListener("click", () => {
   state.playlist.filter(t => t.isLocal).forEach(t => dbDel(t.trackId).catch(() => {}));
   state.playlist = []; savePlaylist(); renderPlaylist();
 });
+$("#sharePl").addEventListener("click", sharePlaylist);
 $("#playlistToggle").addEventListener("click", () => $("#playlistPanel").classList.toggle("open"));
 $("#closePl").addEventListener("click", () => $("#playlistPanel").classList.remove("open"));
 function openPlaylist() { $("#playlistPanel").classList.add("open"); }
@@ -1212,6 +1269,7 @@ $("#genres").addEventListener("click", e => {
 loadPlaylist();
 renderPlaylist();
 restoreLocalUrls(); // recharge les fichiers locaux persistés (IndexedDB)
+loadSharedPlaylist();
 </script>
 </body>
 </html>
